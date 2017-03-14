@@ -32,6 +32,8 @@ import com.oracle.truffle.api.object.DynamicObject;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.api.source.Source;
 import org.jcodings.specific.ASCIIEncoding;
+import org.jcodings.specific.USASCIIEncoding;
+import org.truffleruby.Layouts;
 import org.truffleruby.Log;
 import org.truffleruby.builtins.CoreClass;
 import org.truffleruby.builtins.CoreMethod;
@@ -49,6 +51,7 @@ import org.truffleruby.language.control.RaiseException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
 @CoreClass("Truffle::Interop")
 public abstract class InteropNodes {
@@ -702,4 +705,68 @@ public abstract class InteropNodes {
         }
 
     }
+
+    @CoreMethod(names = "polyglot_in_read", isModuleFunction = true, required = 1, lowerFixnum = 1)
+    public abstract static class PolyglotInReadNode extends CoreMethodArrayArgumentsNode {
+
+        @TruffleBoundary
+        @Specialization
+        public DynamicObject polyglotInRead(int length) {
+            byte[] buffer = new byte[length];
+
+            final int read;
+
+            try {
+                read = getContext().getEnv().in().read(buffer);
+            } catch (IOException e) {
+                throw new JavaException(e);
+            }
+
+            if (read == -1) {
+                return nil();
+            }
+
+            if (read < buffer.length) {
+                buffer = Arrays.copyOf(buffer, read);
+            }
+
+            return createString(buffer, USASCIIEncoding.INSTANCE);
+        }
+
+    }
+
+    @CoreMethod(names = "polyglot_out_write", isModuleFunction = true, required = 1)
+    public abstract static class PolyglotOutWriteNode extends CoreMethodArrayArgumentsNode {
+
+        @TruffleBoundary
+        @Specialization(guards = "isRubyString(value)")
+        public DynamicObject polyglotOutWrite(DynamicObject value) {
+            try {
+                getContext().getEnv().out().write(Layouts.STRING.getRope(value).getBytes());
+            } catch (IOException e) {
+                throw new JavaException(e);
+            }
+
+            return nil();
+        }
+
+    }
+
+    @CoreMethod(names = "polyglot_err_write", isModuleFunction = true, required = 1)
+    public abstract static class PolyglotErrWriteNode extends CoreMethodArrayArgumentsNode {
+
+        @TruffleBoundary
+        @Specialization(guards = "isRubyString(value)")
+        public DynamicObject polyglotErrWrite(DynamicObject value) {
+            try {
+                getContext().getEnv().err().write(Layouts.STRING.getRope(value).getBytes());
+            } catch (IOException e) {
+                throw new JavaException(e);
+            }
+
+            return nil();
+        }
+
+    }
+
 }

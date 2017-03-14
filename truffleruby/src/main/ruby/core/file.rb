@@ -1348,8 +1348,29 @@ class File::Stat
 end
 
 STDIN = File.new(0)
+
+def STDIN.read(length, outbuf=nil)
+  bytes = Truffle::Interop.polyglot_in_read length
+  return nil unless bytes
+  if outbuf
+    outbuf << bytes
+    outbuf
+  else
+    bytes
+  end
+end
+
 STDOUT = File.new(1)
+
+def STDOUT.write(bytes)
+  Truffle::Interop.polyglot_out_write bytes
+end
+
 STDERR = File.new(2)
+
+def STDERR.write(bytes)
+  Truffle::Interop.polyglot_err_write bytes
+end
 
 $stdin = STDIN
 $stdout = STDOUT
